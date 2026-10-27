@@ -1,2 +1,4 @@
 outputs/
 sample/
+__pycache__/
+*.pyc

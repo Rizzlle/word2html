@@ -2,7 +2,19 @@
 
 Konverter terminal berbasis Python (tanpa paket tambahan) untuk mengubah satu file `.docx` menjadi satu halaman HTML utuh. Urutan teks, judul, daftar dan penomorannya, pemformatan dasar, tautan, serta tabel dipertahankan. Nomor halaman Word diabaikan.
 
-## Pemakaian
+## Pemakaian dengan pemilih file
+
+Di Windows, buka `wizard.pyw` dengan klik dua kali (atau jalankan `pythonw wizard.pyw`). Pilih satu atau beberapa file `.docx` sekaligus (gunakan `Ctrl`/`Shift` pada pemilih file); semuanya diproses ke folder `outputs/`. Jika ada nama hasil yang sudah ada, wizard meminta satu konfirmasi: **Ya** menimpa hasil lama, **Tidak** melewati file tersebut dan tetap memproses file lain. Setelah selesai, jumlah yang berhasil, dilewati, dan gagal ditampilkan.
+
+Jika dua dokumen terpilih mempunyai nama yang sama, hasil kedua diberi akhiran `(2)` agar tidak saling menimpa.
+
+Pemilih file yang sama juga bisa dibuka dari terminal:
+
+```powershell
+python word2html.py
+```
+
+## Pemakaian lewat terminal
 
 ```powershell
 python word2html.py "sample.docx"

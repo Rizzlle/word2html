@@ -9,7 +9,7 @@ from unittest.mock import patch
 from xml.etree import ElementTree as ET
 from zipfile import ZipFile
 
-from word2html import Numbering, convert_file, main
+from word2html import Numbering, convert_file, main, run_wizard
 
 
 W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
@@ -113,6 +113,59 @@ class ConversionTests(unittest.TestCase):
                 self.assertEqual(0, main([str(source)]))
             self.assertTrue((output_dir / "terms.html").is_file())
             self.assertFalse(source.with_suffix(".html").exists())
+
+    def test_no_cli_argument_opens_file_picker(self):
+        with patch("word2html.run_wizard", return_value=0) as wizard:
+            self.assertEqual(0, main([]))
+        wizard.assert_called_once_with()
+
+    def test_wizard_converts_selected_document_and_confirms_overwrite(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            source = root / "terms.docx"
+            copyfile(SAMPLE, source)
+            output_dir = root / "outputs"
+            target = output_dir / "terms.html"
+            with (patch("word2html.DEFAULT_OUTPUT_DIR", output_dir),
+                  patch("tkinter.Tk") as tk_root,
+                  patch("tkinter.filedialog.askopenfilenames", return_value=(str(source),)),
+                  patch("tkinter.messagebox.showinfo") as showinfo,
+                  patch("tkinter.messagebox.askyesno", return_value=False) as confirm):
+                self.assertEqual(0, run_wizard())
+                self.assertTrue(target.is_file())
+                self.assertEqual(0, confirm.call_count)
+                showinfo.assert_called_once()
+
+                target.write_text("existing", encoding="utf-8")
+                self.assertEqual(0, run_wizard())
+                self.assertEqual("existing", target.read_text(encoding="utf-8"))
+                self.assertEqual(1, confirm.call_count)
+                tk_root.return_value.destroy.assert_called()
+
+    def test_wizard_converts_multiple_documents_and_skips_existing_results(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            sources = [root / "first" / "terms.docx",
+                       root / "second" / "terms.docx",
+                       root / "third" / "other.docx"]
+            for source in sources:
+                source.parent.mkdir()
+                copyfile(SAMPLE, source)
+            output_dir = root / "outputs"
+            output_dir.mkdir()
+            (output_dir / "terms.html").write_text("existing", encoding="utf-8")
+            with (patch("word2html.DEFAULT_OUTPUT_DIR", output_dir),
+                  patch("tkinter.Tk"),
+                  patch("tkinter.filedialog.askopenfilenames",
+                        return_value=tuple(str(source) for source in sources)),
+                  patch("tkinter.messagebox.askyesno", return_value=False) as confirm,
+                  patch("tkinter.messagebox.showinfo") as showinfo):
+                self.assertEqual(0, run_wizard())
+            confirm.assert_called_once()
+            self.assertEqual("existing", (output_dir / "terms.html").read_text(encoding="utf-8"))
+            self.assertTrue((output_dir / "terms (2).html").is_file())
+            self.assertTrue((output_dir / "other.html").is_file())
+            self.assertIn("2 berhasil, 1 dilewati, 0 gagal", showinfo.call_args.args[1])
 
     def test_numbering_respects_starts_levels_and_restarts(self):
         xml = f'''<w:numbering xmlns:w="{W[1:-1]}">

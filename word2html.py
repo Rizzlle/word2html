@@ -513,12 +513,92 @@ def convert_file(source: Path, destination: Path, force: bool = False) -> None:
         output.write(html)
 
 
+def run_wizard() -> int:
+    try:
+        import tkinter as tk
+        from tkinter import filedialog, messagebox
+    except ImportError as exc:
+        print(f"Gagal membuka pemilih file: {exc}", file=sys.stderr)
+        return 1
+    try:
+        root = tk.Tk()
+    except tk.TclError as exc:
+        print(f"Gagal membuka pemilih file: {exc}", file=sys.stderr)
+        return 1
+
+    root.withdraw()
+    try:
+        selected = filedialog.askopenfilenames(
+            parent=root,
+            title="Pilih satu atau beberapa dokumen Word",
+            filetypes=[("Dokumen Word (.docx)", "*.docx")],
+        )
+        if not selected:
+            return 0
+        planned: list[tuple[Path, Path]] = []
+        used_names: set[str] = set()
+        for raw_source in selected:
+            source = Path(raw_source)
+            name = source.with_suffix(".html").name
+            if name.casefold() in used_names:
+                number = 2
+                while True:
+                    name = f"{source.stem} ({number}).html"
+                    if name.casefold() not in used_names:
+                        break
+                    number += 1
+            used_names.add(name.casefold())
+            planned.append((source, DEFAULT_OUTPUT_DIR / name))
+
+        existing = [target for _, target in planned if target.exists()]
+        overwrite = False
+        if existing:
+            overwrite = messagebox.askyesno(
+                "File hasil sudah ada",
+                f"{len(existing)} file HTML sudah ada di folder outputs.\n"
+                "Pilih Ya untuk menimpanya, atau Tidak untuk melewatinya.",
+                parent=root,
+            )
+        converted: list[Path] = []
+        skipped = 0
+        errors: list[str] = []
+        for source, destination in planned:
+            if destination.exists() and not overwrite:
+                skipped += 1
+                continue
+            try:
+                convert_file(source, destination, force=overwrite and destination.exists())
+            except (ValueError, FileExistsError, BadZipFile, OSError) as exc:
+                errors.append(f"{source.name}: {exc}")
+            else:
+                converted.append(destination)
+
+        summary = (f"{len(converted)} berhasil, {skipped} dilewati, {len(errors)} gagal.\n"
+                   f"Folder hasil: {DEFAULT_OUTPUT_DIR}")
+        if errors:
+            details = "\n".join(errors[:5])
+            if len(errors) > 5:
+                details += f"\n... dan {len(errors) - 5} kesalahan lain"
+            messagebox.showerror("Konversi selesai dengan kesalahan", f"{summary}\n\n{details}", parent=root)
+            return 1
+        if len(converted) == 1 and skipped == 0:
+            summary = f"HTML tersimpan di:\n{converted[0]}"
+        messagebox.showinfo("Konversi selesai", summary, parent=root)
+        return 0
+    finally:
+        root.destroy()
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Ubah dokumen Word .docx menjadi halaman HTML utuh.")
-    parser.add_argument("source", type=Path, help="File .docx sumber")
+    parser.add_argument("source", nargs="?", type=Path, help="File .docx sumber; kosongkan untuk pemilih file")
     parser.add_argument("-o", "--output", type=Path, help="Lokasi file .html hasil")
     parser.add_argument("--force", action="store_true", help="Timpa file hasil yang sudah ada")
     args = parser.parse_args(argv)
+    if args.source is None:
+        if args.output is not None or args.force:
+            parser.error("-o dan --force memerlukan file sumber")
+        return run_wizard()
     destination = args.output if args.output else DEFAULT_OUTPUT_DIR / args.source.with_suffix(".html").name
     try:
         convert_file(args.source, destination, args.force)
