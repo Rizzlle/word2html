@@ -5,7 +5,7 @@ Konverter terminal berbasis Python (tanpa paket tambahan) untuk mengubah satu fi
 ## Pemakaian
 
 ```powershell
-python word2html.py "sample/ISA ID AFTER - Konven & Syariah.docx"
+python word2html.py "sample.docx"
 ```
 
 Hasil default tersimpan di folder `outputs/` di dalam proyek, dengan nama file sumber dan ekstensi `.html`. Folder hasil dibuat otomatis. Untuk menentukan lokasi hasil atau menimpa file yang sudah ada:
